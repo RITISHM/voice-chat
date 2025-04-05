@@ -21,12 +21,12 @@
 
     <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
     <script>
-      const socket = io();
+      const socket = io("http://127.0.0.1:80", { transports: ["websocket"] });
 
       const usernameInput = document.getElementById("username");
       const roomInput = document.getElementById("room");
       const createButton = document.getElementById("create");
-      const joinButton = document.getElementId("join");
+      const joinButton = document.getElementById("join");
       const leaveButton = document.getElementById("leave");
       const startButton = document.getElementById("start");
 
@@ -62,25 +62,48 @@
         const room = roomInput.value;
         if (!room) return alert("Join a room first!");
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-        });
-        const audioContext = new (window.AudioContext ||
-          window.webkitAudioContext)();
-        const source = audioContext.createMediaStreamSource(stream);
-        const processor = audioContext.createScriptProcessor(1024, 1, 1);
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+          });
+          console.log("Microphone access granted");
 
-        source.connect(processor);
-        processor.connect(audioContext.destination);
+          const audioContext = new (window.AudioContext ||
+            window.webkitAudioContext)();
+          const source = audioContext.createMediaStreamSource(stream);
+          const processor = audioContext.createScriptProcessor(1024, 1, 1);
 
-        processor.onaudioprocess = (event) => {
-          const audioData = event.inputBuffer.getChannelData(0);
-          socket.emit("audio_data", { audio: audioData, room });
-        };
+          source.connect(processor);
+          processor.connect(audioContext.destination);
 
-        socket.on("audio_data", (data) => {
-          console.log("Received audio data:", data);
-        });
+          processor.onaudioprocess = (event) => {
+            console.log("Sending audio data...");
+            const audioData = event.inputBuffer.getChannelData(0);
+            socket.emit("audio_data", { audio: audioData, room });
+          };
+
+          socket.on("audio_data", (data) => {
+            console.log("Received audio data:", data);
+
+            let audioBuffer = new Float32Array(data.audio);
+            const playbackContext = new (window.AudioContext ||
+              window.webkitAudioContext)();
+            const buffer = playbackContext.createBuffer(
+              1,
+              audioBuffer.length,
+              playbackContext.sampleRate
+            );
+            buffer.copyToChannel(audioBuffer, 0, 0);
+
+            const source = playbackContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(playbackContext.destination);
+            source.start();
+          });
+        } catch (error) {
+          console.error("Error accessing microphone:", error);
+          alert("Please allow microphone access.");
+        }
       };
 
       socket.on("message", (message) => {

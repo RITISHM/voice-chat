@@ -4,3 +4,4 @@ eventlet==0.33.3
 flask-cors==3.0.10
 gevent==22.10.2
 gevent-websocket==0.10.1
+numpy==1.23.5

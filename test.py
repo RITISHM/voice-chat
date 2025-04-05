@@ -2,10 +2,11 @@ from flask import Flask, render_template
 from flask_socketio import SocketIO, join_room, leave_room, emit
 from flask_cors import CORS
 import eventlet
+import numpy as np
 
 class VoiceChatApp:
     def __init__(self):
-        self.app = Flask(__name__,template_folder="templates")
+        self.app = Flask(__name__)
         CORS(self.app)  # Enable Cross-Origin Requests
         self.socketio = SocketIO(self.app, cors_allowed_origins="*", async_mode='eventlet')
         self.rooms = set()  # Track created rooms
@@ -41,10 +42,11 @@ class VoiceChatApp:
         @self.socketio.on('audio_data')
         def handle_audio_data(data):
             room = data['room']
-            emit('audio_data', data['audio'], to=room)
+            audio_samples = np.array(data['audio']).tolist()  # Convert to list format
+            emit('audio_data', {'audio': audio_samples}, to=room)
 
     def run(self):
-        self.socketio.run(self.app, debug=True, host='0.0.0.0', port=5000)
+        self.socketio.run(self.app, debug=True, host='127.0.0.1', port=80)
 
 if __name__ == '__main__':
     chat_app = VoiceChatApp()
