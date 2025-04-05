@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voice Chat with Rooms</title>
+  </head>
+  <body>
+    <h1>Voice Chat App with Rooms</h1>
+
+    <label for="username">Username:</label>
+    <input type="text" id="username" />
+
+    <label for="room">Room:</label>
+    <input type="text" id="room" />
+
+    <button id="join">Join Room</button>
+    <button id="leave">Leave Room</button>
+    <button id="start">Start Voice Chat</button>
+
+    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+    <script>
+      const socket = io("http://127.0.0.1:5000", { transports: ["websocket"] });
+
+      const usernameInput = document.getElementById("username");
+      const roomInput = document.getElementById("room");
+      const joinButton = document.getElementById("join");
+      const leaveButton = document.getElementById("leave");
+      const startButton = document.getElementById("start");
+
+      joinButton.onclick = () => {
+        const username = usernameInput.value;
+        const room = roomInput.value;
+        if (username && room) {
+          socket.emit("join_room", { username, room });
+        }
+      };
+
+      leaveButton.onclick = () => {
+        const username = usernameInput.value;
+        const room = roomInput.value;
+        if (username && room) {
+          socket.emit("leave_room", { username, room });
+        }
+      };
+
+      startButton.onclick = async () => {
+        const room = roomInput.value;
+        if (!room) return alert("Join a room first!");
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        const audioContext = new (window.AudioContext ||
+          window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
+        const processor = audioContext.createScriptProcessor(1024, 1, 1);
+
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+
+        processor.onaudioprocess = (event) => {
+          const audioData = event.inputBuffer.getChannelData(0);
+          socket.emit("audio_data", { audio: audioData, room });
+        };
+
+        socket.on("audio_data", (data) => {
+          console.log("Received audio data:", data);
+        });
+      };
+
+      socket.on("message", (message) => {
+        console.log(message);
+      });
+    </script>
+  </body>
+</html>
