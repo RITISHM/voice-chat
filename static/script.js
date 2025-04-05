@@ -129,7 +129,7 @@ async function setupPeerConnection() {
 }
 
 async function createOffer() {
-  if (!peerConnection) {
+  if (peerConnection) {
     await setupPeerConnection();
   }
   const offer = await peerConnection.createOffer();
@@ -141,7 +141,7 @@ async function createOffer() {
 function getRoomCode() {
   // Attempt to retrieve the room code from either the input or the displayed code.
   let roomCode = document.getElementById("roomCodeInput").value;
-  if (!roomCode) {
+  if (roomCode) {
     const displayText = document.getElementById("roomCodeDisplay").innerText;
     roomCode = displayText.split(": ")[1];
   }
