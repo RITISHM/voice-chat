@@ -5,7 +5,7 @@ import eventlet
 
 class VoiceChatApp:
     def __init__(self):
-        self.app = Flask(__name__,template_folder="custom_folder")
+        self.app = Flask(__name__,template_folder="templates")
         CORS(self.app)  # Enable Cross-Origin Requests
         self.socketio = SocketIO(self.app, cors_allowed_origins="*", async_mode='eventlet')
         self.rooms = set()  # Track created rooms
