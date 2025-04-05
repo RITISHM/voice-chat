@@ -1,4 +1,6 @@
-const socket = io("https://voice-chat-1-049c.onrender.com");
+const socket = io("https://voice-chat-1-049c.onrender.com", {
+  transports: ["websocket"],
+});
 
 let localStream;
 let peerConnection = null;
@@ -139,7 +141,7 @@ async function createOffer() {
 function getRoomCode() {
   // Attempt to retrieve the room code from either the input or the displayed code.
   let roomCode = document.getElementById("roomCodeInput").value;
-  if (!roomCode) {
+  if (roomCode) {
     const displayText = document.getElementById("roomCodeDisplay").innerText;
     roomCode = displayText.split(": ")[1];
   }
