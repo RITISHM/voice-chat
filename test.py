@@ -8,6 +8,7 @@ class VoiceChatApp:
         self.app = Flask(__name__)
         CORS(self.app)  # Enable Cross-Origin Requests
         self.socketio = SocketIO(self.app, cors_allowed_origins="*", async_mode='eventlet')
+        self.rooms = set()  # Track created rooms
         self.configure_routes()
         self.configure_socket_events()
 
@@ -17,11 +18,19 @@ class VoiceChatApp:
             return render_template('index.html')
 
     def configure_socket_events(self):
+        @self.socketio.on('create_room')
+        def handle_create_room(data):
+            room = data['room']
+            if room not in self.rooms:
+                self.rooms.add(room)
+                emit('message', f"Room {room} has been created!", broadcast=True)
+
         @self.socketio.on('join_room')
         def handle_join_room(data):
             room = data['room']
-            join_room(room)
-            emit('message', f"{data['username']} has joined room {room}.", to=room)
+            if room in self.rooms:
+                join_room(room)
+                emit('message', f"{data['username']} has joined room {room}.", to=room)
 
         @self.socketio.on('leave_room')
         def handle_leave_room(data):
