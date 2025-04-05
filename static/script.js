@@ -1,4 +1,6 @@
-const socket = io("https://voice-chat-1-049c.onrender.com");
+const socket = io("https://voice-chat-1-049c.onrender.com", {
+  transports: ["websocket"],
+});
 
 let localStream;
 let peerConnection = null;
