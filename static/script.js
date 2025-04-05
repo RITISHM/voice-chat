@@ -129,7 +129,7 @@ async function setupPeerConnection() {
 }
 
 async function createOffer() {
-  if (!peerConnection) {
+  if (peerConnection) {
     await setupPeerConnection();
   }
   const offer = await peerConnection.createOffer();
