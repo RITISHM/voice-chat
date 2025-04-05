@@ -2,113 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Voice Chat with Rooms</title>
+    <title>Voice Chat Rooms</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
   </head>
   <body>
-    <h1>Voice Chat App with Rooms</h1>
-
-    <label for="username">Username:</label>
-    <input type="text" id="username" />
-
-    <label for="room">Room:</label>
-    <input type="text" id="room" />
-
-    <button id="create">Create Room</button>
-    <button id="join">Join Room</button>
-    <button id="leave">Leave Room</button>
-    <button id="start">Start Voice Chat</button>
-
-    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
-    <script>
-      const socket = io("http://127.0.0.1:80", { transports: ["websocket"] });
-
-      const usernameInput = document.getElementById("username");
-      const roomInput = document.getElementById("room");
-      const createButton = document.getElementById("create");
-      const joinButton = document.getElementById("join");
-      const leaveButton = document.getElementById("leave");
-      const startButton = document.getElementById("start");
-
-      // Create Room
-      createButton.onclick = () => {
-        const room = roomInput.value;
-        if (room) {
-          socket.emit("create_room", { room });
-          alert(`Room "${room}" created! Users can now join.`);
-        }
-      };
-
-      // Join Room
-      joinButton.onclick = () => {
-        const username = usernameInput.value;
-        const room = roomInput.value;
-        if (username && room) {
-          socket.emit("join_room", { username, room });
-        }
-      };
-
-      // Leave Room
-      leaveButton.onclick = () => {
-        const username = usernameInput.value;
-        const room = roomInput.value;
-        if (username && room) {
-          socket.emit("leave_room", { username, room });
-        }
-      };
-
-      // Start Voice Chat
-      startButton.onclick = async () => {
-        const room = roomInput.value;
-        if (!room) return alert("Join a room first!");
-
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-          });
-          console.log("Microphone access granted");
-
-          const audioContext = new (window.AudioContext ||
-            window.webkitAudioContext)();
-          const source = audioContext.createMediaStreamSource(stream);
-          const processor = audioContext.createScriptProcessor(1024, 1, 1);
-
-          source.connect(processor);
-          processor.connect(audioContext.destination);
-
-          processor.onaudioprocess = (event) => {
-            console.log("Sending audio data...");
-            const audioData = event.inputBuffer.getChannelData(0);
-            socket.emit("audio_data", { audio: audioData, room });
-          };
-
-          socket.on("audio_data", (data) => {
-            console.log("Received audio data:", data);
-
-            let audioBuffer = new Float32Array(data.audio);
-            const playbackContext = new (window.AudioContext ||
-              window.webkitAudioContext)();
-            const buffer = playbackContext.createBuffer(
-              1,
-              audioBuffer.length,
-              playbackContext.sampleRate
-            );
-            buffer.copyToChannel(audioBuffer, 0, 0);
-
-            const source = playbackContext.createBufferSource();
-            source.buffer = buffer;
-            source.connect(playbackContext.destination);
-            source.start();
-          });
-        } catch (error) {
-          console.error("Error accessing microphone:", error);
-          alert("Please allow microphone access.");
-        }
-      };
-
-      socket.on("message", (message) => {
-        console.log(message);
-      });
-    </script>
+    <h1>Voice Chat Rooms</h1>
+    <button onclick="createRoom()">Create Room</button>
+    <input type="text" id="roomCodeInput" placeholder="Enter room code" />
+    <button onclick="joinRoom()">Join Room</button>
+    <div id="roomCodeDisplay"></div>
+    <div id="audioContainer"></div>
+    <!-- Socket.IO library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
   </body>
 </html>
