@@ -16,7 +16,9 @@ def index():
 
 @socketio.on('create_room')
 def handle_create_room(data):
+   
     room_code = room_manager.create_room()
+    print("room created:",room_code)
     # Auto-join the creator to the room.
     join_room(room_code)
     socketio.emit('room_created', {'room_code': room_code}, to=request.sid)
@@ -68,4 +70,4 @@ def handle_webrtc_candidate(data):
                   room=room_code, include_self=False)
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True,host="0.0.0.0",port="5000")
+    socketio.run(app, debug=True)
