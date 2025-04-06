@@ -1,4 +1,4 @@
-const socket = io("https://voice-chat-1-049c.onrender.com", {
+const socket = io("http://127.0.0.1:5000", {
   transports: ["websocket"],
 });
 
@@ -29,7 +29,16 @@ function joinRoom() {
 
 function joinRoomWithCode(roomCode) {
   socket.emit("join_room", { room_code: roomCode });
+  document.getElementById(
+    "roomCodeDisplay"
+  ).innerText = `Room Code: ${roomCode}`;
   startVoiceCommunication(roomCode);
+}
+function leaveRoom() {
+  const roomCode = document.getElementById("roomCodeInput").value;
+
+  socket.emit("leave_room", { room_code: roomCode });
+  document.getElementById("roomCodeDisplay").innerText = `not in room`;
 }
 
 socket.on("room_not_found", (data) => {
