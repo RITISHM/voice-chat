@@ -1,14 +1,18 @@
+// Connect to the Socket.IO server using websocket transport
+// Use http:// for local development if you're not running HTTPS locally
 const socket = io("https://voice-chat-1-049c.onrender.com", {
   transports: ["websocket"],
 });
 
-let localStream;
+let localStream = null;
 let peerConnection = null;
-const config = {
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-};
+const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
-// Create or join room
+// -----------------------
+// Room Controls
+// -----------------------
+
+// Create Room
 function createRoom() {
   socket.emit("create_room", {});
 }
@@ -18,10 +22,10 @@ socket.on("room_created", (data) => {
   document.getElementById(
     "roomCodeDisplay"
   ).innerText = `Room Code: ${data.room_code}`;
-  // Auto-join the room using the displayed code.
   joinRoomWithCode(data.room_code);
 });
 
+// Join Room
 function joinRoom() {
   const roomCode = document.getElementById("roomCodeInput").value;
   joinRoomWithCode(roomCode);
@@ -34,11 +38,30 @@ function joinRoomWithCode(roomCode) {
   ).innerText = `Room Code: ${roomCode}`;
   startVoiceCommunication(roomCode);
 }
+
+// Leave Room
 function leaveRoom() {
   const roomCode = document.getElementById("roomCodeInput").value;
-
   socket.emit("leave_room", { room_code: roomCode });
-  document.getElementById("roomCodeDisplay").innerText = `not in room`;
+  document.getElementById("roomCodeDisplay").innerText = `Not in a room`;
+
+  // Close the peerConnection if it exists and clear resources
+  if (peerConnection) {
+    peerConnection.close();
+    peerConnection = null;
+  }
+
+  // Stop local media stream tracks
+  if (localStream) {
+    localStream.getTracks().forEach((track) => track.stop());
+    localStream = null;
+  }
+
+  // Remove all audio elements (both local and remote)
+  const audioContainer = document.getElementById("audioContainer");
+  while (audioContainer.firstChild) {
+    audioContainer.removeChild(audioContainer.firstChild);
+  }
 }
 
 socket.on("room_not_found", (data) => {
@@ -49,63 +72,74 @@ socket.on("user_joined", (data) => {
   console.log(`Joined room: ${data.room_code}`);
 });
 
-// When a new peer connects, initiate an offer if no connection exists.
+// -----------------------
+// WebRTC Handling
+// -----------------------
+
 socket.on("new_peer", (data) => {
+  console.log("New peer joined:", data.id);
   if (!peerConnection) {
     createOffer();
   }
 });
-
-// ----- WebRTC Signaling Handlers -----
 
 socket.on("webrtc_offer", async (data) => {
   console.log("Received offer from", data.sender);
   if (!peerConnection) {
     await setupPeerConnection();
   }
-  await peerConnection.setRemoteDescription(
-    new RTCSessionDescription(data.offer)
-  );
-  const answer = await peerConnection.createAnswer();
-  await peerConnection.setLocalDescription(answer);
-  const roomCode = getRoomCode();
-  socket.emit("webrtc_answer", { room_code: roomCode, answer: answer });
+  try {
+    await peerConnection.setRemoteDescription(
+      new RTCSessionDescription(data.offer)
+    );
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    socket.emit("webrtc_answer", { room_code: getRoomCode(), answer: answer });
+  } catch (e) {
+    console.error("Error handling offer:", e);
+  }
 });
 
 socket.on("webrtc_answer", async (data) => {
   console.log("Received answer from", data.sender);
   if (peerConnection) {
-    await peerConnection.setRemoteDescription(
-      new RTCSessionDescription(data.answer)
-    );
-  }
-});
-
-socket.on("webrtc_candidate", async (data) => {
-  console.log("Received candidate");
-  if (peerConnection) {
     try {
-      await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+      await peerConnection.setRemoteDescription(
+        new RTCSessionDescription(data.answer)
+      );
     } catch (e) {
-      console.error("Error adding received candidate", e);
+      console.error("Error setting remote description from answer:", e);
     }
   }
 });
 
-// ----- Media and Connection Setup -----
+socket.on("webrtc_candidate", async (data) => {
+  console.log("Received ICE candidate");
+  if (peerConnection) {
+    try {
+      await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+    } catch (e) {
+      console.error("Error adding ICE candidate:", e);
+    }
+  }
+});
+
+// -----------------------
+// Media & Connection Setup
+// -----------------------
 
 function startVoiceCommunication(roomCode) {
   navigator.mediaDevices
     .getUserMedia({ audio: true })
     .then((stream) => {
       localStream = stream;
-      // Play local audio (muted to avoid feedback)
+      // Create a local audio element (muted to avoid feedback)
       const localAudio = document.createElement("audio");
       localAudio.srcObject = localStream;
       localAudio.muted = true;
       localAudio.autoplay = true;
       document.getElementById("audioContainer").appendChild(localAudio);
-      // Notify readiness after accessing the microphone.
+      // Notify peers that you're ready
       socket.emit("ready", { room_code: roomCode });
     })
     .catch((err) => console.error("Error accessing microphone:", err));
@@ -113,12 +147,13 @@ function startVoiceCommunication(roomCode) {
 
 async function setupPeerConnection() {
   peerConnection = new RTCPeerConnection(config);
-  // Add local stream tracks to the connection.
+
   if (localStream) {
-    localStream
-      .getTracks()
-      .forEach((track) => peerConnection.addTrack(track, localStream));
+    localStream.getTracks().forEach((track) => {
+      peerConnection.addTrack(track, localStream);
+    });
   }
+
   peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
       const roomCode = getRoomCode();
@@ -128,7 +163,12 @@ async function setupPeerConnection() {
       });
     }
   };
+
   peerConnection.ontrack = (event) => {
+    // If the stream is actually the local stream, ignore it
+    if (event.streams && event.streams[0] === localStream) {
+      return;
+    }
     console.log("Received remote stream");
     const remoteAudio = document.createElement("audio");
     remoteAudio.srcObject = event.streams[0];
@@ -141,14 +181,16 @@ async function createOffer() {
   if (!peerConnection) {
     await setupPeerConnection();
   }
-  const offer = await peerConnection.createOffer();
-  await peerConnection.setLocalDescription(offer);
-  const roomCode = getRoomCode();
-  socket.emit("webrtc_offer", { room_code: roomCode, offer: offer });
+  try {
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    socket.emit("webrtc_offer", { room_code: getRoomCode(), offer: offer });
+  } catch (e) {
+    console.error("Error creating offer:", e);
+  }
 }
 
 function getRoomCode() {
-  // Attempt to retrieve the room code from either the input or the displayed code.
   let roomCode = document.getElementById("roomCodeInput").value;
   if (!roomCode) {
     const displayText = document.getElementById("roomCodeDisplay").innerText;
