@@ -1,5 +1,5 @@
 // Connect to the Socket.IO server (adjust URL/protocol as needed)
-const socket = io("http://127.0.0.1:5000", {
+const socket = io("https://voice-chat-1-049c.onrender.com/", {
   transports: ["websocket"],
 });
 
